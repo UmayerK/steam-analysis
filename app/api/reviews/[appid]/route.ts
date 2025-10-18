@@ -21,11 +21,14 @@ export async function GET(
     const cursor = searchParams.get('cursor') || undefined;
     const numPerPage = parseInt(searchParams.get('num_per_page') || '20', 10);
     const filter = searchParams.get('filter') as 'recent' | 'updated' | 'all' | undefined;
+    const language = searchParams.get('language') || 'all';
+    const sortByPlaytime = searchParams.get('sort_by_playtime') as 'most' | 'least' | null;
 
     const reviewsData = await getGameReviews(appIdNum, {
       cursor,
       num_per_page: numPerPage,
       filter,
+      language,
     });
 
     if (!reviewsData) {
@@ -36,7 +39,14 @@ export async function GET(
     }
 
     // Analyze sentiment for each review
-    const reviewsWithSentiment = analyzeReviews(reviewsData.reviews);
+    let reviewsWithSentiment = analyzeReviews(reviewsData.reviews);
+
+    // Sort by playtime if requested
+    if (sortByPlaytime === 'most') {
+      reviewsWithSentiment.sort((a, b) => b.author.playtime_forever - a.author.playtime_forever);
+    } else if (sortByPlaytime === 'least') {
+      reviewsWithSentiment.sort((a, b) => a.author.playtime_forever - b.author.playtime_forever);
+    }
 
     return NextResponse.json({
       ...reviewsData,

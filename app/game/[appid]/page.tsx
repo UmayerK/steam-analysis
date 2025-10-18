@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Card, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { WishlistButton } from "@/components/wishlist-button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select } from "@/components/ui/select";
 import { WorkshopSection } from "@/components/workshop-section";
 import { NewsSection } from "@/components/news-section";
 import { CommunityLinks } from "@/components/community-links";
@@ -23,7 +24,51 @@ export default function GamePage({ params }: PageProps) {
   const [reviews, setReviews] = useState<ReviewWithSentiment[]>([]);
   const [sentimentStats, setSentimentStats] = useState<SentimentStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
 
+  // Filter states
+  const [language, setLanguage] = useState('all');
+  const [sortByPlaytime, setSortByPlaytime] = useState<string>('default');
+
+  const observerTarget = useRef(null);
+
+  // Fetch reviews with filters
+  const fetchReviews = useCallback(async (isLoadMore = false, currentCursor: string | null = null) => {
+    try {
+      const params = new URLSearchParams({
+        num_per_page: '20',
+        language,
+      });
+
+      if (sortByPlaytime !== 'default') {
+        params.set('sort_by_playtime', sortByPlaytime);
+      }
+
+      if (isLoadMore && currentCursor) {
+        params.set('cursor', currentCursor);
+      }
+
+      const reviewsRes = await fetch(`/api/reviews/${appid}?${params.toString()}`);
+      if (reviewsRes.ok) {
+        const reviewsData = await reviewsRes.json();
+
+        if (isLoadMore) {
+          setReviews(prev => [...prev, ...reviewsData.reviews]);
+        } else {
+          setReviews(reviewsData.reviews);
+        }
+
+        setCursor(reviewsData.cursor);
+        setHasMore(reviewsData.reviews.length === 20);
+      }
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+    }
+  }, [appid, language, sortByPlaytime]);
+
+  // Initial data fetch
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -35,11 +80,7 @@ export default function GamePage({ params }: PageProps) {
         }
 
         // Fetch reviews with sentiment
-        const reviewsRes = await fetch(`/api/reviews/${appid}`);
-        if (reviewsRes.ok) {
-          const reviewsData = await reviewsRes.json();
-          setReviews(reviewsData.reviews);
-        }
+        await fetchReviews(false, null);
 
         // Fetch sentiment stats
         const sentimentRes = await fetch(`/api/sentiment/${appid}`);
@@ -55,7 +96,41 @@ export default function GamePage({ params }: PageProps) {
     };
 
     fetchData();
-  }, [appid]);
+  }, [appid, fetchReviews]);
+
+  // Refetch when filters change
+  useEffect(() => {
+    if (!isLoading) {
+      setReviews([]);
+      setCursor(null);
+      setHasMore(true);
+      fetchReviews(false, null);
+    }
+  }, [language, sortByPlaytime, isLoading, fetchReviews]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          setIsLoadingMore(true);
+          fetchReviews(true, cursor).finally(() => setIsLoadingMore(false));
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, isLoadingMore, cursor, fetchReviews]);
 
   if (isLoading) {
     return (
@@ -255,37 +330,91 @@ export default function GamePage({ params }: PageProps) {
           </TabsList>
 
           <TabsContent value="reviews">
-            <h2 className="mb-6 text-3xl font-bold text-white">
-              Recent Reviews with Sentiment Analysis
-            </h2>
+            <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
+              <h2 className="text-3xl font-bold text-white">
+                Recent Reviews with Sentiment Analysis
+              </h2>
+
+              <div className="flex gap-4 flex-wrap">
+                <Select
+                  label="Language"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                >
+                  <option value="all">All Languages</option>
+                  <option value="english">English</option>
+                  <option value="spanish">Spanish</option>
+                  <option value="french">French</option>
+                  <option value="german">German</option>
+                  <option value="russian">Russian</option>
+                  <option value="schinese">Simplified Chinese</option>
+                  <option value="tchinese">Traditional Chinese</option>
+                  <option value="japanese">Japanese</option>
+                  <option value="korean">Korean</option>
+                  <option value="portuguese">Portuguese</option>
+                  <option value="brazilian">Brazilian Portuguese</option>
+                </Select>
+
+                <Select
+                  label="Sort by Playtime"
+                  value={sortByPlaytime}
+                  onChange={(e) => setSortByPlaytime(e.target.value)}
+                >
+                  <option value="default">Default</option>
+                  <option value="most">Most Hours</option>
+                  <option value="least">Least Hours</option>
+                </Select>
+              </div>
+            </div>
+
             <div className="space-y-4">
               {reviews.length > 0 ? (
-                reviews.slice(0, 10).map((review) => (
-                  <Card key={review.recommendationid}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="mb-2 flex items-center gap-2">
-                          <Badge
-                            variant={review.sentimentLabel}
-                          >
-                            {review.sentimentLabel.toUpperCase()} (Score: {review.sentiment.score.toFixed(1)})
-                          </Badge>
-                          <Badge variant={review.voted_up ? "positive" : "negative"}>
-                            {review.voted_up ? "👍 Recommended" : "👎 Not Recommended"}
-                          </Badge>
-                          <span className="text-sm text-gray-400">
-                            {new Date(review.timestamp_created * 1000).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p className="text-gray-300">{review.review}</p>
-                        <div className="mt-2 flex items-center gap-4 text-sm text-gray-400">
-                          <span>{(review.author.playtime_forever / 60).toFixed(1)} hours played</span>
-                          <span>👍 {review.votes_up} helpful</span>
+                <>
+                  {reviews.map((review) => (
+                    <Card key={review.recommendationid}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="mb-2 flex items-center gap-2 flex-wrap">
+                            <Badge
+                              variant={review.sentimentLabel}
+                            >
+                              {review.sentimentLabel.toUpperCase()} (Score: {review.sentiment.score.toFixed(1)})
+                            </Badge>
+                            <Badge variant={review.voted_up ? "positive" : "negative"}>
+                              {review.voted_up ? "👍 Recommended" : "👎 Not Recommended"}
+                            </Badge>
+                            <span className="text-sm text-gray-400">
+                              {new Date(review.timestamp_created * 1000).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-gray-300">{review.review}</p>
+                          <div className="mt-2 flex items-center gap-4 text-sm text-gray-400">
+                            <span>{(review.author.playtime_forever / 60).toFixed(1)} hours played</span>
+                            <span>👍 {review.votes_up} helpful</span>
+                          </div>
                         </div>
                       </div>
+                    </Card>
+                  ))}
+
+                  {/* Infinite scroll trigger */}
+                  {hasMore && (
+                    <div ref={observerTarget} className="flex justify-center py-8">
+                      {isLoadingMore && (
+                        <div className="flex items-center gap-2 text-gray-400">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white"></div>
+                          <span>Loading more reviews...</span>
+                        </div>
+                      )}
                     </div>
-                  </Card>
-                ))
+                  )}
+
+                  {!hasMore && reviews.length > 0 && (
+                    <div className="text-center py-8 text-gray-400">
+                      No more reviews to load
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-12">
                   <div className="mb-4 text-5xl">📝</div>
