@@ -24,36 +24,6 @@ export default function Home() {
         <div className="mb-16">
           <HeroBanner />
         </div>
-
-        {/* Info Section */}
-        <div className="text-center">
-          <h2 className="mb-8 text-3xl font-bold text-white">
-            How It Works
-          </h2>
-          <div className="grid gap-8 md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-8 backdrop-blur-sm">
-              <div className="mb-4 text-4xl">🔍</div>
-              <h3 className="mb-2 text-xl font-bold text-white">Search Games</h3>
-              <p className="text-gray-400">
-                Find any Steam game using our search feature
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-8 backdrop-blur-sm">
-              <div className="mb-4 text-4xl">🤖</div>
-              <h3 className="mb-2 text-xl font-bold text-white">AI Analysis</h3>
-              <p className="text-gray-400">
-                Our NLP model analyzes review sentiment in real-time
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-8 backdrop-blur-sm">
-              <div className="mb-4 text-4xl">📊</div>
-              <h3 className="mb-2 text-xl font-bold text-white">View Insights</h3>
-              <p className="text-gray-400">
-                Get detailed sentiment statistics and trends
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
     </main>
   );
