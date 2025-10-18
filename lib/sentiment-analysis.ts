@@ -178,15 +178,45 @@ export function analyzeReview(review: SteamReview): ReviewWithSentiment {
   const textSentiment = analyzeSentiment(review.review);
 
   // Start with Steam's vote as the base
-  // voted_up = true → start at 7 (positive base)
-  // voted_up = false → start at 3 (negative base)
-  let baseScore = review.voted_up ? 7 : 3;
+  // voted_up = true → start at 5.5-8 range (positive base)
+  // voted_up = false → start at 2-4.5 range (negative base)
+  const reviewLength = review.review.length;
 
-  // Normalize text sentiment from -5..+5 range to -3..+3 range for adjustment
-  const normalizedTextScore = Math.max(-3, Math.min(3, textSentiment.score * 0.6));
+  // Add variation based on review length for base score
+  // Longer reviews tend to be more thoughtful, shorter ones more impulsive
+  const lengthFactor = Math.min(reviewLength / 200, 1); // 0 to 1 based on length up to 200 chars
+
+  let baseScore: number;
+  if (review.voted_up) {
+    // Positive reviews: 5.5 (very short) to 6.5 (longer)
+    baseScore = 5.5 + (lengthFactor * 1.0);
+  } else {
+    // Negative reviews: 4.5 (very short) to 3.5 (longer)
+    baseScore = 4.5 - (lengthFactor * 1.0);
+  }
+
+  // Use comparative score (normalized by word count) for better differentiation
+  // Comparative is typically between -0.5 and 0.5 for most reviews
+  // Amplify it significantly to create variation
+  let textAdjustment = textSentiment.comparative * 30;
+
+  // Also consider absolute sentiment score for very strong sentiments
+  const absoluteScoreAdjustment = textSentiment.score * 0.5;
+
+  // Add variation based on positive/negative word count
+  const wordRatio = textSentiment.tokens.length > 0
+    ? (textSentiment.positive.length - textSentiment.negative.length) / Math.max(textSentiment.tokens.length, 1)
+    : 0;
+  const wordRatioAdjustment = wordRatio * 5;
+
+  // Combine all adjustments
+  const totalAdjustment = textAdjustment + absoluteScoreAdjustment + wordRatioAdjustment;
+
+  // Clamp adjustment to reasonable range
+  const clampedAdjustment = Math.max(-4, Math.min(4, totalAdjustment));
 
   // Combine base score with text sentiment
-  let finalScore = baseScore + normalizedTextScore;
+  let finalScore = baseScore + clampedAdjustment;
 
   // Clamp to 0-10 range
   finalScore = Math.max(0, Math.min(10, finalScore));
