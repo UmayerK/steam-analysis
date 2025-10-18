@@ -33,12 +33,26 @@ export async function GET(
     // Analyze sentiment for each review
     const reviewsWithSentiment = analyzeReviews(reviewsData.reviews);
 
-    // Calculate sentiment statistics
+    // Calculate sentiment statistics from our analysis
     const sentimentStats = calculateSentimentStats(reviewsWithSentiment);
 
+    // Use Steam's actual review summary for overall statistics (more accurate)
+    // Our sentiment analysis is for individual review enrichment
+    const steamSummary = reviewsData.query_summary;
+    const totalReviews = steamSummary.total_reviews;
+    const positiveReviews = steamSummary.total_positive;
+    const negativeReviews = steamSummary.total_negative;
+
     return NextResponse.json({
-      ...sentimentStats,
-      steamStats: reviewsData.query_summary,
+      overall: {
+        averageScore: sentimentStats.overall.averageScore,
+        positiveCount: positiveReviews, // Use Steam's total
+        neutralCount: 0, // Steam doesn't track neutral
+        negativeCount: negativeReviews, // Use Steam's total
+        totalReviews: totalReviews, // Use Steam's total
+      },
+      timeline: sentimentStats.timeline,
+      steamStats: steamSummary,
     });
   } catch (error) {
     console.error('Error calculating sentiment stats:', error);

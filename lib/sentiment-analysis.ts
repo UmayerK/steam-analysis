@@ -161,19 +161,52 @@ export function analyzeSentiment(text: string): SentimentScore {
 }
 
 /**
- * Get sentiment label based on score
+ * Get sentiment label based on 0-10 score
  */
 export function getSentimentLabel(score: number): 'positive' | 'neutral' | 'negative' {
-  if (score > 1) return 'positive';
-  if (score < -1) return 'negative';
+  if (score >= 6) return 'positive';
+  if (score <= 4) return 'negative';
   return 'neutral';
 }
 
 /**
  * Analyze a single review and add sentiment data
+ * Returns a 0-10 score combining Steam's vote with text analysis
  */
 export function analyzeReview(review: SteamReview): ReviewWithSentiment {
-  const sentimentScore = analyzeSentiment(review.review);
+  // Get text-based sentiment (returns score typically between -5 to +5)
+  const textSentiment = analyzeSentiment(review.review);
+
+  // Start with Steam's vote as the base
+  // voted_up = true → start at 7 (positive base)
+  // voted_up = false → start at 3 (negative base)
+  let baseScore = review.voted_up ? 7 : 3;
+
+  // Normalize text sentiment from -5..+5 range to -3..+3 range for adjustment
+  const normalizedTextScore = Math.max(-3, Math.min(3, textSentiment.score * 0.6));
+
+  // Combine base score with text sentiment
+  let finalScore = baseScore + normalizedTextScore;
+
+  // Clamp to 0-10 range
+  finalScore = Math.max(0, Math.min(10, finalScore));
+
+  // Ensure voted_up reviews stay >= 5 and voted_down reviews stay <= 5
+  // (but allow text sentiment to push them towards the extremes)
+  if (review.voted_up && finalScore < 5) {
+    finalScore = 5;
+  } else if (!review.voted_up && finalScore > 5) {
+    finalScore = 5;
+  }
+
+  const sentimentScore: SentimentScore = {
+    score: Math.round(finalScore * 10) / 10, // Round to 1 decimal
+    comparative: textSentiment.comparative,
+    tokens: textSentiment.tokens,
+    positive: textSentiment.positive,
+    negative: textSentiment.negative,
+  };
+
   const sentimentLabel = getSentimentLabel(sentimentScore.score);
 
   return {
