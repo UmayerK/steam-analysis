@@ -2,8 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { GameCard } from "@/components/game-card";
 import type { SteamSpyGame } from "@/lib/types";
 
 interface PageProps {
@@ -42,19 +41,6 @@ export default function CategoryDetailPage({ params }: PageProps) {
     }
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-400";
-    if (score >= 60) return "text-yellow-400";
-    return "text-red-400";
-  };
-
-  const formatOwners = (owners: string) => {
-    const parts = owners.split(' .. ');
-    if (parts.length === 2) {
-      return `${parts[0]} - ${parts[1]} owners`;
-    }
-    return owners;
-  };
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-black via-slate-950 to-black">
@@ -82,35 +68,19 @@ export default function CategoryDetailPage({ params }: PageProps) {
           </div>
         ) : (
           <>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {games.map((game) => (
-                <Link key={game.appid} href={`/game/${game.appid}`}>
-                  <Card className="h-full transition-all hover:scale-105">
-                    <h3 className="mb-2 text-lg font-bold text-white line-clamp-2">
-                      {game.name}
-                    </h3>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      <Badge variant="default" className="text-xs">
-                        <span className={getScoreColor(game.userscore)}>
-                          {game.userscore}% Positive
-                        </span>
-                      </Badge>
-                      {game.price === '0' ? (
-                        <Badge variant="positive" className="text-xs">Free</Badge>
-                      ) : (
-                        <Badge variant="default" className="text-xs">
-                          ${(parseFloat(game.price) / 100).toFixed(2)}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="space-y-1 text-sm text-gray-400">
-                      <p>{formatOwners(game.owners)}</p>
-                      {game.developer && (
-                        <p className="line-clamp-1">By {game.developer}</p>
-                      )}
-                    </div>
-                  </Card>
-                </Link>
+                <GameCard
+                  key={game.appid}
+                  appid={game.appid}
+                  name={game.name}
+                  score={game.userscore}
+                  price={game.price}
+                  developer={game.developer}
+                  genre={game.genre}
+                  owners={game.owners}
+                  isFree={game.price === '0'}
+                />
               ))}
             </div>
 
