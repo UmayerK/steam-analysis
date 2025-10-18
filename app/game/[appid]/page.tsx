@@ -7,6 +7,10 @@ import { Card, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { WishlistButton } from "@/components/wishlist-button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { WorkshopSection } from "@/components/workshop-section";
+import { NewsSection } from "@/components/news-section";
+import { CommunityLinks } from "@/components/community-links";
 import type { SteamAppDetails, ReviewWithSentiment, SentimentStats } from "@/lib/types";
 
 interface PageProps {
@@ -241,40 +245,68 @@ export default function GamePage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Reviews */}
-        <div>
-          <h2 className="mb-6 text-3xl font-bold text-white">
-            Recent Reviews with Sentiment Analysis
-          </h2>
-          <div className="space-y-4">
-            {reviews.slice(0, 10).map((review) => (
-              <Card key={review.recommendationid}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="mb-2 flex items-center gap-2">
-                      <Badge
-                        variant={review.sentimentLabel}
-                      >
-                        {review.sentimentLabel.toUpperCase()} (Score: {review.sentiment.score.toFixed(1)})
-                      </Badge>
-                      <Badge variant={review.voted_up ? "positive" : "negative"}>
-                        {review.voted_up ? "👍 Recommended" : "👎 Not Recommended"}
-                      </Badge>
-                      <span className="text-sm text-gray-400">
-                        {new Date(review.timestamp_created * 1000).toLocaleDateString()}
-                      </span>
+        {/* Tabbed Community Content */}
+        <Tabs defaultValue="reviews" className="w-full">
+          <TabsList className="w-full justify-start overflow-x-auto">
+            <TabsTrigger value="reviews">Reviews & Sentiment</TabsTrigger>
+            <TabsTrigger value="workshop">Workshop & Mods</TabsTrigger>
+            <TabsTrigger value="news">News & Updates</TabsTrigger>
+            <TabsTrigger value="community">Community</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="reviews">
+            <h2 className="mb-6 text-3xl font-bold text-white">
+              Recent Reviews with Sentiment Analysis
+            </h2>
+            <div className="space-y-4">
+              {reviews.length > 0 ? (
+                reviews.slice(0, 10).map((review) => (
+                  <Card key={review.recommendationid}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="mb-2 flex items-center gap-2">
+                          <Badge
+                            variant={review.sentimentLabel}
+                          >
+                            {review.sentimentLabel.toUpperCase()} (Score: {review.sentiment.score.toFixed(1)})
+                          </Badge>
+                          <Badge variant={review.voted_up ? "positive" : "negative"}>
+                            {review.voted_up ? "👍 Recommended" : "👎 Not Recommended"}
+                          </Badge>
+                          <span className="text-sm text-gray-400">
+                            {new Date(review.timestamp_created * 1000).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-300">{review.review}</p>
+                        <div className="mt-2 flex items-center gap-4 text-sm text-gray-400">
+                          <span>{(review.author.playtime_forever / 60).toFixed(1)} hours played</span>
+                          <span>👍 {review.votes_up} helpful</span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-gray-300">{review.review}</p>
-                    <div className="mt-2 flex items-center gap-4 text-sm text-gray-400">
-                      <span>{(review.author.playtime_forever / 60).toFixed(1)} hours played</span>
-                      <span>👍 {review.votes_up} helpful</span>
-                    </div>
-                  </div>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-12">
+                  <div className="mb-4 text-5xl">📝</div>
+                  <p className="text-gray-400">No reviews available yet</p>
                 </div>
-              </Card>
-            ))}
-          </div>
-        </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="workshop">
+            <WorkshopSection appid={appid} />
+          </TabsContent>
+
+          <TabsContent value="news">
+            <NewsSection appid={appid} />
+          </TabsContent>
+
+          <TabsContent value="community">
+            <CommunityLinks appid={appid} gameName={game.name} />
+          </TabsContent>
+        </Tabs>
       </div>
     </main>
   );

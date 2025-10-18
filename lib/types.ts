@@ -150,3 +150,78 @@ export interface TopGamesFilters {
   priceRange?: 'free' | 'under10' | '10to30' | 'over30';
   country?: string;
 }
+
+// Steam Community Types
+export interface SteamNewsItem {
+  gid: string;
+  title: string;
+  url: string;
+  is_external_url: boolean;
+  author: string;
+  contents: string;
+  feedlabel: string;
+  date: number;
+  feedname: string;
+}
+
+export interface SteamNewsResponse {
+  appnews: {
+    appid: number;
+    newsitems: SteamNewsItem[];
+    count: number;
+  };
+}
+
+export interface WorkshopItem {
+  publishedfileid: string;
+  result: number;
+  creator: string;
+  creator_appid: number;
+  consumer_appid: number;
+  consumer_shortcutid: number;
+  filename: string;
+  file_size: string;
+  preview_url: string;
+  hcontent_preview: string;
+  title: string;
+  file_description: string;
+  time_created: number;
+  time_updated: number;
+  visibility: number;
+  flags: number;
+  workshop_file: boolean;
+  workshop_accepted: boolean;
+  show_subscribe_all: boolean;
+  num_comments_public: number;
+  banned: boolean;
+  ban_reason: string;
+  banner: string;
+  can_be_deleted: boolean;
+  app_name: string;
+  file_type: number;
+  can_subscribe: boolean;
+  subscriptions: number;
+  favorited: number;
+  followers: number;
+  lifetime_subscriptions: number;
+  lifetime_favorited: number;
+  lifetime_followers: number;
+  views: number;
+  tags: Array<{
+    tag: string;
+    display_name: string;
+  }>;
+  vote_data?: {
+    score: number;
+    votes_up: number;
+    votes_down: number;
+  };
+}
+
+export interface WorkshopResponse {
+  response: {
+    result: number;
+    resultcount: number;
+    publishedfiledetails: WorkshopItem[];
+  };
+}

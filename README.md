@@ -25,7 +25,6 @@ An AI-powered sentiment analysis tool for Steam game reviews built with Next.js,
 ### Prerequisites
 
 - Node.js 18+ installed
-- A Steam API key (optional - Steam's public APIs are used)
 
 ### Installation
 
@@ -40,19 +39,12 @@ cd "Vibe Code"
 npm install
 ```
 
-3. Set up environment variables:
-```bash
-# The .env file is already created
-# Add your Steam API key if needed (currently optional)
-STEAM_API_KEY=your_steam_api_key_here
-```
-
-4. Run the development server:
+3. Run the development server:
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Project Structure
 
@@ -133,10 +125,11 @@ npm start
 
 ## Notes
 
-- Steam API has rate limits - the app caches data where possible
+- The app uses Steam's public APIs exclusively - no API key required
+- Steam API has rate limits - the app handles errors gracefully
 - Some Steam games may not have reviews available
-- Sentiment analysis is performed server-side to keep the API key secure
-- The app uses Steam's public APIs which don't require authentication for most features
+- Sentiment analysis is performed server-side for better performance
+- Workshop features are not available as they require authentication
 
 ## License
 

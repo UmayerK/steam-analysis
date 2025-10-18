@@ -79,19 +79,18 @@ export async function getGameReviews(
   }
 ): Promise<SteamReviewsResponse | null> {
   try {
-    const response = await steamApi.get(
-      `${config.steamStoreApiBaseUrl}/appreviews/${appId}`,
-      {
-        params: {
-          json: 1,
-          cursor: params?.cursor || '*',
-          num_per_page: params?.num_per_page || 20,
-          filter: params?.filter || 'recent',
-          language: params?.language || 'english',
-          purchase_type: 'all',
-        },
-      }
-    );
+    // Note: Reviews endpoint is at store.steampowered.com/appreviews, NOT /api/appreviews
+    const url = `https://store.steampowered.com/appreviews/${appId}`;
+    const requestParams = {
+      json: 1,
+      cursor: params?.cursor || '*',
+      num_per_page: params?.num_per_page || 20,
+      filter: params?.filter || 'recent',
+      language: params?.language || 'english',
+      purchase_type: 'all',
+    };
+
+    const response = await steamApi.get(url, { params: requestParams });
 
     if (response.data.success !== 1) {
       return null;
