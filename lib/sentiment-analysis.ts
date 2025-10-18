@@ -118,41 +118,36 @@ function preprocessReviewText(text: string): string {
 }
 
 /**
- * Analyze sentiment of a single review text with improved algorithm
+ * Analyze sentiment of review text using NLP
+ * Combines base sentiment with rating patterns and emoji analysis
  */
 export function analyzeSentiment(text: string): SentimentScore {
-  // Extract rating score
+  // Pre-process text to convert rating patterns into sentiment words
+  const processedText = preprocessReviewText(text);
+
+  // Run NLP sentiment analysis
+  const result = sentiment.analyze(processedText);
+
+  // Extract and normalize rating patterns (10/10 → positive boost)
   const ratingScore = extractRatingScore(text);
 
   // Analyze emoji sentiment
   const emojiScore = analyzeEmojiSentiment(text);
 
-  // Pre-process text
-  const processedText = preprocessReviewText(text);
-
-  // Run base sentiment analysis
-  const result = sentiment.analyze(processedText);
-
-  // Calculate weighted score
-  let finalScore = result.score;
-
-  // For short reviews, give more weight to other signals
+  // Weight different signals based on review length
   const isShortReview = text.length < 50;
+  let finalScore: number;
 
   if (isShortReview) {
-    // For short reviews: 40% base, 40% rating, 20% emoji
-    finalScore = (result.score * 0.4) +
-                 ((ratingScore || 0) * 0.4) +
-                 (emojiScore * 0.2);
+    // Short reviews: Give more weight to ratings/emojis (40% base, 40% rating, 20% emoji)
+    finalScore = (result.score * 0.4) + ((ratingScore || 0) * 0.4) + (emojiScore * 0.2);
   } else {
-    // For longer reviews: 70% base, 20% rating, 10% emoji
-    finalScore = (result.score * 0.7) +
-                 ((ratingScore || 0) * 0.2) +
-                 (emojiScore * 0.1);
+    // Long reviews: Prioritize text analysis (70% base, 20% rating, 10% emoji)
+    finalScore = (result.score * 0.7) + ((ratingScore || 0) * 0.2) + (emojiScore * 0.1);
   }
 
   return {
-    score: Math.round(finalScore * 10) / 10, // Round to 1 decimal
+    score: Math.round(finalScore * 10) / 10,
     comparative: result.comparative,
     tokens: result.tokens,
     positive: result.positive,
@@ -172,62 +167,63 @@ export function getSentimentLabel(score: number): 'positive' | 'neutral' | 'nega
 /**
  * Analyze a single review and add sentiment data
  * Returns a 0-10 score combining Steam's vote with text analysis
+ *
+ * Score ranges:
+ * - 9-10: Exceptional positive (e.g., "10/10 masterpiece", "best game ever")
+ * - 7-8: Very positive (e.g., "great game", "highly recommend")
+ * - 6-7: Positive (e.g., "good", "worth it")
+ * - 4-6: Neutral/Mixed
+ * - 3-4: Negative (e.g., "not good", "disappointing")
+ * - 1-2: Very negative (e.g., "trash", "terrible")
+ * - 0-1: Extremely negative (e.g., "worst game", "complete garbage")
  */
 export function analyzeReview(review: SteamReview): ReviewWithSentiment {
-  // Get text-based sentiment (returns score typically between -5 to +5)
+  // Get text-based sentiment analysis
   const textSentiment = analyzeSentiment(review.review);
 
-  // Start with Steam's vote as the base
-  // voted_up = true → start at 5.5-8 range (positive base)
-  // voted_up = false → start at 2-4.5 range (negative base)
+  // Start with Steam's thumbs up/down as foundation
+  // Use a wider base score range to create more variation
   const reviewLength = review.review.length;
 
-  // Add variation based on review length for base score
-  // Longer reviews tend to be more thoughtful, shorter ones more impulsive
-  const lengthFactor = Math.min(reviewLength / 200, 1); // 0 to 1 based on length up to 200 chars
-
+  // Adjust base score based on review length and sentiment strength
   let baseScore: number;
   if (review.voted_up) {
-    // Positive reviews: 5.5 (very short) to 6.5 (longer)
-    baseScore = 5.5 + (lengthFactor * 1.0);
+    // Positive reviews: Start between 5.0-7.0 depending on length and sentiment
+    const lengthBonus = Math.min(reviewLength / 100, 1.5); // 0 to 1.5 based on length
+    const sentimentBonus = textSentiment.comparative > 0 ? textSentiment.comparative * 2 : 0;
+    baseScore = 5.0 + lengthBonus + sentimentBonus;
   } else {
-    // Negative reviews: 4.5 (very short) to 3.5 (longer)
-    baseScore = 4.5 - (lengthFactor * 1.0);
+    // Negative reviews: Start between 3.0-5.0 depending on length and sentiment
+    const lengthPenalty = Math.min(reviewLength / 100, 1.0);
+    const sentimentPenalty = textSentiment.comparative < 0 ? Math.abs(textSentiment.comparative) * 2 : 0;
+    baseScore = 5.0 - lengthPenalty - sentimentPenalty;
   }
 
-  // Use comparative score (normalized by word count) for better differentiation
-  // Comparative is typically between -0.5 and 0.5 for most reviews
-  // Amplify it significantly to create variation
-  let textAdjustment = textSentiment.comparative * 30;
+  // Calculate adjustments from text sentiment
+  // Amplify absolute sentiment score heavily
+  const absoluteAdjustment = textSentiment.score * 2.0;
 
-  // Also consider absolute sentiment score for very strong sentiments
-  const absoluteScoreAdjustment = textSentiment.score * 0.5;
-
-  // Add variation based on positive/negative word count
+  // Calculate positive/negative word ratio and amplify
   const wordRatio = textSentiment.tokens.length > 0
-    ? (textSentiment.positive.length - textSentiment.negative.length) / Math.max(textSentiment.tokens.length, 1)
+    ? (textSentiment.positive.length - textSentiment.negative.length) / textSentiment.tokens.length
     : 0;
-  const wordRatioAdjustment = wordRatio * 5;
+  const wordRatioAdjustment = wordRatio * 15;
 
-  // Combine all adjustments
-  const totalAdjustment = textAdjustment + absoluteScoreAdjustment + wordRatioAdjustment;
+  // Add variation based on word count (more words = more extreme scores)
+  const wordCountFactor = Math.min(textSentiment.tokens.length / 10, 2);
+  const wordCountAdjustment = (review.voted_up ? 1 : -1) * wordCountFactor * 0.5;
 
-  // Clamp adjustment to reasonable range
-  const clampedAdjustment = Math.max(-4, Math.min(4, totalAdjustment));
+  // Combine all sentiment signals
+  const totalAdjustment = absoluteAdjustment + wordRatioAdjustment + wordCountAdjustment;
 
-  // Combine base score with text sentiment
+  // Allow wide adjustment range
+  const clampedAdjustment = Math.max(-5, Math.min(5, totalAdjustment));
+
+  // Calculate final score
   let finalScore = baseScore + clampedAdjustment;
 
-  // Clamp to 0-10 range
+  // Clamp to 0-10 range only
   finalScore = Math.max(0, Math.min(10, finalScore));
-
-  // Ensure voted_up reviews stay >= 5 and voted_down reviews stay <= 5
-  // (but allow text sentiment to push them towards the extremes)
-  if (review.voted_up && finalScore < 5) {
-    finalScore = 5;
-  } else if (!review.voted_up && finalScore > 5) {
-    finalScore = 5;
-  }
 
   const sentimentScore: SentimentScore = {
     score: Math.round(finalScore * 10) / 10, // Round to 1 decimal

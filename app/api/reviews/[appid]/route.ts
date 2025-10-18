@@ -23,6 +23,7 @@ export async function GET(
     const filter = searchParams.get('filter') as 'recent' | 'updated' | 'all' | undefined;
     const language = searchParams.get('language') || 'all';
     const sortByPlaytime = searchParams.get('sort_by_playtime') as 'most' | 'least' | null;
+    const sortBySentiment = searchParams.get('sort_by_sentiment') as 'positive' | 'negative' | null;
 
     const reviewsData = await getGameReviews(appIdNum, {
       cursor,
@@ -41,8 +42,15 @@ export async function GET(
     // Analyze sentiment for each review
     let reviewsWithSentiment = analyzeReviews(reviewsData.reviews);
 
-    // Sort by playtime if requested
-    if (sortByPlaytime === 'most') {
+    // Sort by sentiment if requested (takes priority over playtime sorting)
+    if (sortBySentiment === 'positive') {
+      // Most positive first (highest score to lowest)
+      reviewsWithSentiment.sort((a, b) => b.sentiment.score - a.sentiment.score);
+    } else if (sortBySentiment === 'negative') {
+      // Most negative first (lowest score to highest)
+      reviewsWithSentiment.sort((a, b) => a.sentiment.score - b.sentiment.score);
+    } else if (sortByPlaytime === 'most') {
+      // Sort by playtime if sentiment sorting not requested
       reviewsWithSentiment.sort((a, b) => b.author.playtime_forever - a.author.playtime_forever);
     } else if (sortByPlaytime === 'least') {
       reviewsWithSentiment.sort((a, b) => a.author.playtime_forever - b.author.playtime_forever);

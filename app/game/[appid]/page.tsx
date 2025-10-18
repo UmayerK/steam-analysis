@@ -31,6 +31,7 @@ export default function GamePage({ params }: PageProps) {
   // Filter states
   const [language, setLanguage] = useState('all');
   const [sortByPlaytime, setSortByPlaytime] = useState<string>('default');
+  const [sortBySentiment, setSortBySentiment] = useState<string>('default');
 
   const observerTarget = useRef(null);
 
@@ -42,7 +43,9 @@ export default function GamePage({ params }: PageProps) {
         language,
       });
 
-      if (sortByPlaytime !== 'default') {
+      if (sortBySentiment !== 'default') {
+        params.set('sort_by_sentiment', sortBySentiment);
+      } else if (sortByPlaytime !== 'default') {
         params.set('sort_by_playtime', sortByPlaytime);
       }
 
@@ -66,7 +69,7 @@ export default function GamePage({ params }: PageProps) {
     } catch (error) {
       console.error("Error fetching reviews:", error);
     }
-  }, [appid, language, sortByPlaytime]);
+  }, [appid, language, sortByPlaytime, sortBySentiment]);
 
   // Initial data fetch
   useEffect(() => {
@@ -106,7 +109,7 @@ export default function GamePage({ params }: PageProps) {
       setHasMore(true);
       fetchReviews(false, null);
     }
-  }, [language, sortByPlaytime, isLoading, fetchReviews]);
+  }, [language, sortByPlaytime, sortBySentiment, isLoading, fetchReviews]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -353,6 +356,16 @@ export default function GamePage({ params }: PageProps) {
                   <option value="korean">Korean</option>
                   <option value="portuguese">Portuguese</option>
                   <option value="brazilian">Brazilian Portuguese</option>
+                </Select>
+
+                <Select
+                  label="Sort by Sentiment"
+                  value={sortBySentiment}
+                  onChange={(e) => setSortBySentiment(e.target.value)}
+                >
+                  <option value="default">Default</option>
+                  <option value="positive">Most Positive</option>
+                  <option value="negative">Most Negative</option>
                 </Select>
 
                 <Select
