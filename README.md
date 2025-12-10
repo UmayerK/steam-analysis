@@ -30,8 +30,8 @@ An AI-powered sentiment analysis tool for Steam game reviews built with Next.js,
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd "Vibe Code"
+git clone `https://github.com/UmayerK/steam-analysis.git`
+cd "steam-analysis"
 ```
 
 2. Install dependencies:
