@@ -110,15 +110,16 @@ export function GameCard({
             <div className="flex-1 rounded-full bg-white/10 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-white/20">
               View Details
             </div>
-            <a
-              href={`https://store.steampowered.com/app/${appid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.open(`https://store.steampowered.com/app/${appid}`, '_blank', 'noopener,noreferrer');
+              }}
               className="flex-1 rounded-full bg-blue-600 px-4 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
             >
               Steam Store
-            </a>
+            </button>
           </div>
         </div>
       </Card>

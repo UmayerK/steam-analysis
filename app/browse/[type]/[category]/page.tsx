@@ -69,19 +69,25 @@ export default function CategoryDetailPage({ params }: PageProps) {
         ) : (
           <>
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {games.map((game) => (
-                <GameCard
-                  key={game.appid}
-                  appid={game.appid}
-                  name={game.name}
-                  score={game.userscore}
-                  price={game.price}
-                  developer={game.developer}
-                  genre={game.genre}
-                  owners={game.owners}
-                  isFree={game.price === '0'}
-                />
-              ))}
+              {games.map((game) => {
+                const totalReviews = (game.positive || 0) + (game.negative || 0);
+                const score = totalReviews > 0
+                  ? Math.round((game.positive / totalReviews) * 100)
+                  : game.userscore;
+                return (
+                  <GameCard
+                    key={game.appid}
+                    appid={game.appid}
+                    name={game.name}
+                    score={score}
+                    price={game.price}
+                    developer={game.developer}
+                    genre={game.genre}
+                    owners={game.owners}
+                    isFree={game.price === '0'}
+                  />
+                );
+              })}
             </div>
 
             {/* Pagination */}

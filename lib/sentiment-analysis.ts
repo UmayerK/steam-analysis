@@ -1,4 +1,3 @@
-import Sentiment from 'sentiment';
 import type {
   SteamReview,
   ReviewWithSentiment,
@@ -6,72 +5,180 @@ import type {
   SentimentStats
 } from './types';
 
-const sentiment = new Sentiment();
+// ─── Word-Level Sentiment Lexicon ──────────────────────────────────────
+// Scores from -5 (very negative) to +5 (very positive)
+const WORD_SCORES: Record<string, number> = {
+  // ── Strong Positive (4-5) ──
+  masterpiece: 5, phenomenal: 5, outstanding: 5, incredible: 5, extraordinary: 5,
+  flawless: 5, perfection: 5, perfect: 5, spectacular: 4, magnificent: 4,
+  exceptional: 4, brilliant: 4, superb: 4, marvelous: 4, stunning: 4,
+  breathtaking: 4, gorgeous: 4, fantastic: 4, wonderful: 4, excellent: 4,
+  goat: 5, goated: 5, godlike: 5, legendary: 4, elite: 4, best: 3,
 
-// Add custom gaming-specific words
-sentiment.registerLanguage('en', {
-  labels: {
-    // Positive gaming terms
-    'masterpiece': 5,
-    'amazing': 3,
-    'awesome': 3,
-    'epic': 3,
-    'goat': 5, // Greatest of all time
-    'pog': 3,
-    'poggers': 3,
-    'gg': 2,
-    'ez': 1,
-    'op': 2, // Overpowered (positive context)
-    'insane': 3,
-    'fire': 3,
-    'banger': 3,
-    'slaps': 3,
-    'bussin': 3,
-    'based': 2,
-    'lit': 3,
-    'goated': 4,
-    'valid': 2,
-    // Negative gaming terms
-    'trash': -3,
-    'garbage': -3,
-    'boring': -2,
-    'mid': -1,
-    'meh': -1,
-    'cringe': -2,
-    'unplayable': -4,
-    'buggy': -2,
-    'broken': -3,
-    'cheaters': -3,
-    'cheater': -3,
-    'hackers': -3,
-    'hacker': -3,
-    'p2w': -3, // Pay to win
-    'scam': -4,
-    'cashgrab': -4,
-  }
-});
+  // ── Positive (2-3) ──
+  amazing: 3, awesome: 3, great: 3, love: 3, loved: 3, loving: 3,
+  beautiful: 3, impressive: 3, addictive: 3, addicting: 3, addicted: 3,
+  engaging: 3, immersive: 3, captivating: 3, compelling: 3, satisfying: 3,
+  polished: 3, recommend: 3, recommended: 3, favorite: 3, favourite: 3,
+  epic: 3, insane: 3, fire: 3, banger: 3, slaps: 3, bussin: 3, poggers: 3, pog: 3,
+  gem: 3, underrated: 3, innovative: 3, revolutionary: 3,
+  good: 2, nice: 2, fun: 2, enjoy: 2, enjoyed: 2, enjoying: 2, enjoyable: 2,
+  cool: 2, solid: 2, smooth: 2, clean: 2, fair: 2, worth: 2,
+  entertaining: 2, interesting: 2, exciting: 2, thrilling: 2,
+  creative: 2, unique: 2, charming: 2, delightful: 2,
+  reliable: 2, stable: 2, responsive: 2, intuitive: 2,
+  happy: 2, glad: 2, pleased: 2, thankful: 2, grateful: 2,
+  gg: 2, based: 2, valid: 2, lit: 3, dope: 2, sick: 2, hype: 2,
+  wholesome: 3, heartwarming: 3,
 
-/**
- * Extract rating patterns from text (e.g., "10/10", "9/10")
- */
+  // ── Mild Positive (1) ──
+  ok: 1, okay: 1, fine: 1, alright: 1, decent: 1, playable: 1,
+  adequate: 1, acceptable: 1, passable: 1, reasonable: 1,
+  ez: 1, neat: 1, chill: 1, relaxing: 1, comfy: 1,
+  like: 1, liked: 1, appreciate: 1, appreciated: 1,
+
+  // ── Mild Negative (-1) ──
+  mid: -1, meh: -1, mediocre: -1, average: -1, bland: -1, generic: -1,
+  repetitive: -1, dull: -1, stale: -1,
+  clunky: -1, awkward: -1, slow: -1, grindy: -1, grind: -1,
+  overpriced: -1, overrated: -1, underwhelming: -1,
+  confusing: -1, annoying: -1, frustrating: -1,
+  eh: -1,
+
+  // ── Negative (-2 to -3) ──
+  bad: -2, poor: -2, terrible: -3, horrible: -3, awful: -3, dreadful: -3,
+  hate: -3, hated: -3, worst: -3, sucks: -3, suck: -3, sucked: -3,
+  ugly: -2, lazy: -2, pathetic: -2, joke: -2,
+  disappointing: -2, disappointed: -2, disappointment: -2,
+  broken: -3, buggy: -2, laggy: -2, glitchy: -2, unfinished: -2, unpolished: -2,
+  crash: -2, crashes: -2, crashing: -2, lag: -2, stuttering: -2, stutter: -2,
+  unfair: -2, unbalanced: -2, toxic: -2, rigged: -2,
+  boring: -2, tedious: -2, monotonous: -2,
+  trash: -3, garbage: -3, rubbish: -3, crap: -3, crappy: -3, shit: -3, shitty: -3,
+  cringe: -2, lame: -2, dead: -2,
+  cheaters: -3, cheater: -3, hackers: -3, hacker: -3, hacks: -2,
+  regret: -2, refund: -2, refunded: -2, uninstall: -2, uninstalled: -2,
+
+  // ── Strong Negative (-4 to -5) ──
+  unplayable: -4, disaster: -4, catastrophe: -4, abomination: -4,
+  scam: -4, cashgrab: -4, ripoff: -4, fraud: -4,
+  p2w: -3, paytowin: -4,
+  malware: -5, spyware: -5, virus: -5,
+  waste: -3, wasted: -3,
+};
+
+// ─── Phrase-Level Patterns ─────────────────────────────────────────────
+// Multi-word phrases with their sentiment scores
+const PHRASE_PATTERNS: Array<{ pattern: RegExp; score: number }> = [
+  // Strong positive phrases
+  { pattern: /\bgame\s*of\s*the\s*year\b/i, score: 5 },
+  { pattern: /\bbest\s+game\s+(i('ve|'ve)?\s+)?(ever|played)\b/i, score: 5 },
+  { pattern: /\bbest\s+game\s+of\s+all\s+time\b/i, score: 5 },
+  { pattern: /\bbest\s+game\b/i, score: 3 },
+  { pattern: /\bgame\s+of\s+the\s+(decade|century|generation)\b/i, score: 5 },
+  { pattern: /\bworth\s+(every|each)\s+(penny|cent|dollar)\b/i, score: 4 },
+  { pattern: /\bhighly\s+recommend(ed)?\b/i, score: 4 },
+  { pattern: /\bmust\s+(have|play|buy|own|get)\b/i, score: 4 },
+  { pattern: /\bcan'?t\s+stop\s+playing\b/i, score: 4 },
+  { pattern: /\bcouldn'?t\s+put\s+(it\s+)?down\b/i, score: 4 },
+  { pattern: /\blove\s+(this|the|it)\b/i, score: 4 },
+  { pattern: /\bhours?\s+of\s+fun\b/i, score: 3 },
+  { pattern: /\bwell\s+(made|crafted|designed|done|polished)\b/i, score: 3 },
+  { pattern: /\bworth\s+(it|the\s+(price|money|buy))\b/i, score: 3 },
+  { pattern: /\bgreat\s+(game|fun|time|experience|gameplay)\b/i, score: 3 },
+  { pattern: /\bgood\s+(game|fun|time|experience|gameplay|stuff)\b/i, score: 3 },
+  { pattern: /\bso\s+(much\s+)?fun\b/i, score: 3 },
+  { pattern: /\breally\s+(good|great|fun|enjoy(ed)?|nice|love|amazing)\b/i, score: 3 },
+  { pattern: /\bvery\s+(good|great|fun|enjoy(able)?|nice|entertaining)\b/i, score: 3 },
+  { pattern: /\bsuper\s+(fun|good|great|cool)\b/i, score: 3 },
+  { pattern: /\bpretty\s+(good|great|fun|cool|solid|nice)\b/i, score: 2 },
+  { pattern: /\bi\s+love\b/i, score: 3 },
+  { pattern: /\bi\s+enjoy(ed)?\b/i, score: 2 },
+  { pattern: /\bi\s+like(d)?\b/i, score: 2 },
+
+  // Positive short patterns
+  { pattern: /^(good|great|nice|fun|cool|solid|amazing|awesome|excellent)\s*(game|one)?[.!]*$/i, score: 4 },
+  { pattern: /^(love|loved)\s*(it|this|this\s*game)?[.!]*$/i, score: 4 },
+  { pattern: /^(recommend(ed)?|worth\s*it)[.!]*$/i, score: 4 },
+  { pattern: /^(yes|yep|ya|yeah|yea|yup)[.!]*$/i, score: 2 },
+  { pattern: /^10\s*\/\s*10[.!]*$/i, score: 5 },
+  { pattern: /^(pretty|very|really|so)\s+(good|great|fun|nice)[.!]*$/i, score: 3 },
+
+  // Negative phrases
+  { pattern: /\bwaste\s+of\s+(time|money)\b/i, score: -4 },
+  { pattern: /\bnot\s+worth\s+(it|the\s+(price|money|time))\b/i, score: -3 },
+  { pattern: /\bdon'?t\s+(buy|bother|waste|get|recommend)\b/i, score: -3 },
+  { pattern: /\bdo\s+not\s+(buy|bother|waste|get|recommend)\b/i, score: -3 },
+  { pattern: /\bstay\s+away\b/i, score: -3 },
+  { pattern: /\bsave\s+your\s+(money|time)\b/i, score: -3 },
+  { pattern: /\bworst\s+(game|purchase|experience)\b/i, score: -4 },
+  { pattern: /\bdead\s+game\b/i, score: -3 },
+  { pattern: /\bnot\s+(fun|good|great|worth|enjoyable|entertaining|recommended)\b/i, score: -3 },
+  { pattern: /\bnot\s+even\s+(close|worth|fun|good|playable)\b/i, score: -3 },
+  { pattern: /\bpay\s*to\s*win\b/i, score: -4 },
+  { pattern: /\bcash\s*grab\b/i, score: -4 },
+  { pattern: /\bgetting\s+worse\b/i, score: -2 },
+  { pattern: /\bused\s+to\s+be\s+(good|great|fun)\b/i, score: -2 },
+  { pattern: /\brip\s*off\b/i, score: -3 },
+  { pattern: /\bbad\s+(game|port|optimization|experience)\b/i, score: -3 },
+
+  // Mixed/neutral but leaning phrases
+  { pattern: /\bnot\s+bad\b/i, score: 1 },
+  { pattern: /\bcould\s+be\s+better\b/i, score: -1 },
+  { pattern: /\bneeds\s+(work|improvement|fixing|updates?|patches?)\b/i, score: -1 },
+  { pattern: /\bhas\s+potential\b/i, score: 0 },
+  { pattern: /\bit'?s\s+okay?\b/i, score: 1 },
+  { pattern: /\bit'?s\s+alright\b/i, score: 1 },
+  { pattern: /\bit'?s\s+fine\b/i, score: 1 },
+];
+
+// ─── Negation Words ────────────────────────────────────────────────────
+const NEGATION_WORDS = new Set([
+  'not', "n't", 'no', 'never', 'neither', 'nobody', 'nothing',
+  'nowhere', 'nor', 'hardly', 'barely', 'scarcely', 'rarely',
+  'dont', "don't", 'doesnt', "doesn't", 'didnt', "didn't",
+  'isnt', "isn't", 'wasnt', "wasn't", 'arent', "aren't",
+  'werent', "weren't", 'wont', "won't", 'wouldnt', "wouldn't",
+  'cant', "can't", 'cannot', 'shouldnt', "shouldn't",
+  'couldnt', "couldn't",
+]);
+
+// ─── Intensity Modifiers ───────────────────────────────────────────────
+const INTENSIFIERS: Record<string, number> = {
+  very: 1.5, really: 1.5, extremely: 2.0, incredibly: 2.0,
+  absolutely: 2.0, totally: 1.5, completely: 1.5, utterly: 2.0,
+  super: 1.5, truly: 1.5, highly: 1.5, deeply: 1.5,
+  so: 1.3, pretty: 1.2, quite: 1.2, rather: 1.1, fairly: 1.1,
+  amazingly: 2.0, insanely: 2.0, ridiculously: 1.8,
+};
+
+const DIMINISHERS: Record<string, number> = {
+  slightly: 0.5, somewhat: 0.6, a_bit: 0.6, a_little: 0.5,
+  kind_of: 0.6, sort_of: 0.6, kinda: 0.6, sorta: 0.6,
+  barely: 0.4, hardly: 0.4,
+};
+
+// ─── Rating Extraction ─────────────────────────────────────────────────
 function extractRatingScore(text: string): number | null {
-  // Match patterns like 10/10, 9/10, 8/10, etc.
   const ratingPattern = /(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/g;
-  const matches = [...text.matchAll(ratingPattern)];
-
+  const matches: RegExpExecArray[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = ratingPattern.exec(text)) !== null) {
+    matches.push(m);
+  }
   if (matches.length === 0) return null;
 
   let totalScore = 0;
   let count = 0;
 
   for (const match of matches) {
-    const numerator = parseFloat(match[1]);
-    const denominator = parseFloat(match[2]);
-
-    if (denominator > 0) {
-      // Normalize to -5 to 5 scale
-      const normalizedScore = ((numerator / denominator) * 10) - 5;
-      totalScore += normalizedScore;
+    const num = parseFloat(match[1]);
+    const den = parseFloat(match[2]);
+    if (den > 0 && den <= 100) {
+      // Normalize to -5 to +5 scale
+      const ratio = num / den;
+      const normalized = (ratio * 10) - 5;
+      totalScore += normalized;
       count++;
     }
   }
@@ -79,207 +186,345 @@ function extractRatingScore(text: string): number | null {
   return count > 0 ? totalScore / count : null;
 }
 
-/**
- * Analyze emoji sentiment
- */
+// ─── Emoji Sentiment ───────────────────────────────────────────────────
 function analyzeEmojiSentiment(text: string): number {
-  const positiveEmojis = ['👍', '😊', '😁', '😂', '🤣', '😍', '🥰', '😎', '🔥', '💯', '✨', '⭐', '🎉', '🎮', '❤️', '💖', '👌', '🙌', '💪'];
-  const negativeEmojis = ['👎', '😞', '😢', '😭', '😡', '😤', '🤮', '💩', '❌', '⛔'];
+  const positiveEmojis = ['👍', '😊', '😁', '😂', '🤣', '😍', '🥰', '😎', '🔥', '💯', '✨', '⭐', '🎉', '❤️', '💖', '👌', '🙌', '💪', '🥇', '🏆', '♥'];
+  const negativeEmojis = ['👎', '😞', '😢', '😭', '😡', '😤', '🤮', '💩', '❌', '⛔', '🚫', '😠', '🤡', '💀'];
 
   let score = 0;
-
   for (const emoji of positiveEmojis) {
-    score += (text.match(new RegExp(emoji, 'g')) || []).length * 2;
+    const matches = text.match(new RegExp(emoji, 'g'));
+    if (matches) score += matches.length * 1.5;
   }
-
   for (const emoji of negativeEmojis) {
-    score -= (text.match(new RegExp(emoji, 'g')) || []).length * 2;
+    const matches = text.match(new RegExp(emoji, 'g'));
+    if (matches) score -= matches.length * 1.5;
   }
-
   return score;
 }
 
-/**
- * Pre-process review text for better sentiment analysis
- */
-function preprocessReviewText(text: string): string {
-  let processed = text;
-
-  // Replace rating patterns with sentiment words to help the analyzer
-  processed = processed.replace(/10\s*\/\s*10/gi, ' perfect excellent ');
-  processed = processed.replace(/9\s*\/\s*10/gi, ' great ');
-  processed = processed.replace(/8\s*\/\s*10/gi, ' good ');
-  processed = processed.replace(/7\s*\/\s*10/gi, ' decent ');
-  processed = processed.replace(/([1-4])\s*\/\s*10/gi, ' bad ');
-  processed = processed.replace(/5\s*\/\s*10/gi, ' okay ');
-  processed = processed.replace(/6\s*\/\s*10/gi, ' okay ');
-
-  return processed;
+// ─── Tokenization ──────────────────────────────────────────────────────
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9'\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length > 0);
 }
 
-/**
- * Analyze sentiment of review text using NLP
- * Combines base sentiment with rating patterns and emoji analysis
- */
-export function analyzeSentiment(text: string): SentimentScore {
-  // Pre-process text to convert rating patterns into sentiment words
-  const processedText = preprocessReviewText(text);
+// ─── Core Word-Level Analysis with Negation & Intensity ────────────────
+function analyzeWords(text: string): {
+  score: number;
+  positiveWords: string[];
+  negativeWords: string[];
+  tokens: string[];
+} {
+  const tokens = tokenize(text);
+  const positiveWords: string[] = [];
+  const negativeWords: string[] = [];
+  let totalScore = 0;
 
-  // Run NLP sentiment analysis
-  const result = sentiment.analyze(processedText);
+  for (let i = 0; i < tokens.length; i++) {
+    const word = tokens[i];
+    const wordScore = WORD_SCORES[word];
 
-  // Extract and normalize rating patterns (10/10 → positive boost)
-  const ratingScore = extractRatingScore(text);
+    if (wordScore === undefined) continue;
 
-  // Analyze emoji sentiment
-  const emojiScore = analyzeEmojiSentiment(text);
+    // Check for negation in the previous 1-3 words
+    let negated = false;
+    for (let j = Math.max(0, i - 3); j < i; j++) {
+      const prevWord = tokens[j];
+      // Check the token itself and handle contractions
+      if (NEGATION_WORDS.has(prevWord)) {
+        negated = true;
+        break;
+      }
+      // Handle "n't" suffix
+      if (prevWord.endsWith("n't") || prevWord.endsWith("nt")) {
+        const base = prevWord.replace(/(n't|nt)$/, '');
+        if (['do', 'does', 'did', 'is', 'was', 'are', 'were', 'wo', 'would', 'could', 'should', 'ca', 'has', 'have', 'had'].includes(base)) {
+          negated = true;
+          break;
+        }
+      }
+    }
 
-  // Weight different signals based on review length
-  const isShortReview = text.length < 50;
-  let finalScore: number;
+    // Check for intensity modifiers in the previous 1-2 words
+    let intensityMult = 1.0;
+    for (let j = Math.max(0, i - 2); j < i; j++) {
+      const prevWord = tokens[j];
+      if (INTENSIFIERS[prevWord]) {
+        intensityMult = INTENSIFIERS[prevWord];
+        break;
+      }
+      if (DIMINISHERS[prevWord]) {
+        intensityMult = DIMINISHERS[prevWord];
+        break;
+      }
+    }
 
-  if (isShortReview) {
-    // Short reviews: Give more weight to ratings/emojis (40% base, 40% rating, 20% emoji)
-    finalScore = (result.score * 0.4) + ((ratingScore || 0) * 0.4) + (emojiScore * 0.2);
-  } else {
-    // Long reviews: Prioritize text analysis (70% base, 20% rating, 10% emoji)
-    finalScore = (result.score * 0.7) + ((ratingScore || 0) * 0.2) + (emojiScore * 0.1);
+    let adjustedScore = wordScore * intensityMult;
+    if (negated) {
+      // Flip the score but reduce magnitude slightly (negation doesn't fully invert)
+      adjustedScore = -adjustedScore * 0.75;
+    }
+
+    totalScore += adjustedScore;
+
+    if (adjustedScore > 0) {
+      positiveWords.push(word);
+    } else if (adjustedScore < 0) {
+      negativeWords.push(word);
+    }
   }
 
+  return { score: totalScore, positiveWords, negativeWords, tokens };
+}
+
+// ─── Phrase-Level Analysis ─────────────────────────────────────────────
+function analyzePhrases(text: string): number {
+  let score = 0;
+  for (const { pattern, score: phraseScore } of PHRASE_PATTERNS) {
+    if (pattern.test(text)) {
+      score += phraseScore;
+    }
+  }
+  return score;
+}
+
+// ─── Tone Analysis ─────────────────────────────────────────────────────
+function analyzeTone(text: string): number {
+  let toneScore = 0;
+
+  // ALL CAPS words indicate strong emotion — amplify in the direction of content
+  const capsWords = text.match(/\b[A-Z]{2,}\b/g) || [];
+  if (capsWords.length > 0) {
+    // Check if caps words are positive or negative
+    for (const w of capsWords) {
+      const lower = w.toLowerCase();
+      const wordScore = WORD_SCORES[lower];
+      if (wordScore) {
+        toneScore += wordScore > 0 ? 1 : -1;
+      } else {
+        // Generic caps = intensity, don't add direction
+      }
+    }
+    // If no scored caps words, just add a small intensity bump
+    if (toneScore === 0 && capsWords.length >= 2) {
+      toneScore = 0.5; // Slight positive bias for enthusiastic caps
+    }
+  }
+
+  // Exclamation marks = intensity/enthusiasm
+  const exclamations = (text.match(/!/g) || []).length;
+  if (exclamations >= 3) {
+    toneScore += 0.5; // Lots of !!! usually positive enthusiasm
+  } else if (exclamations >= 1) {
+    toneScore += 0.2;
+  }
+
+  // Repeated letters (e.g., "sooo goood", "greaaaat") = enthusiasm
+  const stretched = (text.match(/(.)\1{2,}/g) || []).length;
+  if (stretched > 0) {
+    toneScore += 0.3;
+  }
+
+  // Sarcasm markers
+  if (/\/s\b/i.test(text) || /\bsarcasm\b/i.test(text)) {
+    toneScore -= 2; // Likely sarcastic, invert assumed sentiment
+  }
+
+  // "but" and "however" — signal mixed feelings, slightly reduce positive
+  const butCount = (text.match(/\b(but|however|although|though|except)\b/gi) || []).length;
+  if (butCount > 0) {
+    toneScore -= 0.3 * butCount;
+  }
+
+  return toneScore;
+}
+
+// ─── Main Sentiment Analysis Function ──────────────────────────────────
+/**
+ * Analyze the sentiment of a text string.
+ * Returns a raw sentiment score (can be any value, typically -10 to +10 range).
+ */
+export function analyzeSentiment(text: string): SentimentScore {
+  if (!text || text.trim().length === 0) {
+    return { score: 0, comparative: 0, tokens: [], positive: [], negative: [] };
+  }
+
+  // 1. Word-level analysis with negation + intensity
+  const wordAnalysis = analyzeWords(text);
+
+  // 2. Phrase-level analysis
+  const phraseScore = analyzePhrases(text);
+
+  // 3. Emoji analysis
+  const emojiScore = analyzeEmojiSentiment(text);
+
+  // 4. Rating extraction (e.g., "9/10")
+  const ratingScore = extractRatingScore(text);
+
+  // 5. Tone analysis (caps, exclamation, sarcasm)
+  const toneScore = analyzeTone(text);
+
+  // Combine all signals
+  // Phrase matches are very reliable, so give them high weight
+  const wordWeight = 1.0;
+  const phraseWeight = 1.5;
+  const emojiWeight = 0.5;
+  const ratingWeight = 2.0;
+  const toneWeight = 0.5;
+
+  let rawScore = (wordAnalysis.score * wordWeight)
+    + (phraseScore * phraseWeight)
+    + (emojiScore * emojiWeight)
+    + ((ratingScore ?? 0) * ratingWeight)
+    + (toneScore * toneWeight);
+
+  // Normalize comparative score
+  const tokenCount = Math.max(wordAnalysis.tokens.length, 1);
+  const comparative = rawScore / tokenCount;
+
   return {
-    score: Math.round(finalScore * 10) / 10,
-    comparative: result.comparative,
-    tokens: result.tokens,
-    positive: result.positive,
-    negative: result.negative,
+    score: Math.round(rawScore * 10) / 10,
+    comparative: Math.round(comparative * 1000) / 1000,
+    tokens: wordAnalysis.tokens,
+    positive: wordAnalysis.positiveWords,
+    negative: wordAnalysis.negativeWords,
   };
 }
 
+// ─── Review Analysis (0-100 scale) ─────────────────────────────────────
 /**
- * Get sentiment label based on 0-10 score
- */
-export function getSentimentLabel(score: number): 'positive' | 'neutral' | 'negative' {
-  if (score >= 6) return 'positive';
-  if (score <= 4) return 'negative';
-  return 'neutral';
-}
-
-/**
- * Analyze a single review and add sentiment data
- * Returns a 0-10 score combining Steam's vote with text analysis
+ * Composite sentiment scoring on a 0–100 scale.
  *
- * Score ranges:
- * - 9-10: Exceptional positive (e.g., "10/10 masterpiece", "best game ever")
- * - 7-8: Very positive (e.g., "great game", "highly recommend")
- * - 6-7: Positive (e.g., "good", "worth it")
- * - 4-6: Neutral/Mixed
- * - 3-4: Negative (e.g., "not good", "disappointing")
- * - 1-2: Very negative (e.g., "trash", "terrible")
- * - 0-1: Extremely negative (e.g., "worst game", "complete garbage")
+ * Instead of anchoring on a single value and making small adjustments,
+ * this combines FIVE independent continuous signals. Each signal varies
+ * independently per review, so even reviews with identical text get
+ * different scores based on playtime, length, and helpfulness.
+ *
+ * Signals (for voted_up, mirror for voted_down):
+ *   1. Text sentiment  (0-22 pts) — sentiment words, phrases, ratings
+ *   2. Review effort    (0-10 pts) — character length (longer = more conviction)
+ *   3. Playtime         (0-7 pts)  — hours played (more = more informed)
+ *   4. Helpfulness      (0-5 pts)  — community upvotes
+ *   5. Tone             (0-4 pts)  — caps, exclamation, emojis, structure
+ *
+ * voted_up base:  52  → range 52-100
+ * voted_down base: 48 → range 0-48
  */
 export function analyzeReview(review: SteamReview): ReviewWithSentiment {
-  // Get text-based sentiment analysis
-  const textSentiment = analyzeSentiment(review.review);
+  const text = review.review;
+  const textSentiment = analyzeSentiment(text);
+  const raw = textSentiment.score;
 
-  // Start with Steam's thumbs up/down as foundation
-  // Use a wider base score range to create more variation
-  const reviewLength = review.review.length;
+  // ── Signal 1: Text sentiment (biggest differentiator) ──
+  // Linear mapping: raw/15 capped at 1.0
+  // "nice"=2 → 0.13, "good game"=6.5 → 0.43, "masterpiece 10/10"=25 → 1.0
+  const textMagnitude = Math.min(Math.abs(raw) / 15, 1);
+  const textAligned = raw >= 0 === review.voted_up; // text agrees with vote?
 
-  // Adjust base score based on review length and sentiment strength
-  let baseScore: number;
+  // ── Signal 2: Review effort (continuous, log-scaled) ──
+  // 1 char → 0, 50 chars → 0.39, 200 chars → 0.59, 1000 chars → 0.82, 3000 → 1.0
+  const effortSignal = Math.min(Math.log(1 + text.length) / Math.log(1 + 3000), 1);
+
+  // ── Signal 3: Playtime (continuous, log-scaled) ──
+  // 0 hrs → 0, 5 hrs → 0.25, 50 hrs → 0.57, 500 hrs → 0.90, 2000 → 1.0
+  const hours = (review.author.playtime_forever || 0) / 60;
+  const playtimeSignal = Math.min(Math.log(1 + hours) / Math.log(1 + 2000), 1);
+
+  // ── Signal 4: Helpfulness (continuous, log-scaled) ──
+  // 0 votes → 0, 3 → 0.21, 20 → 0.52, 100 → 0.80, 500 → 1.0
+  const helpfulSignal = Math.min(Math.log(1 + (review.votes_up || 0)) / Math.log(1 + 500), 1);
+
+  // ── Signal 5: Tone markers (additive, 0-1) ──
+  const hasExclamation = /!/.test(text) ? 0.25 : 0;
+  const hasCaps = /[A-Z]{3,}/.test(text) ? 0.25 : 0;
+  const hasMultipleSentences = (text.match(/[.!?]+/g) || []).length >= 2 ? 0.25 : 0;
+  const hasEmoji = /[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]|[❤♥👍👎]/u.test(text) ? 0.25 : 0;
+  const toneSignal = Math.min(hasExclamation + hasCaps + hasMultipleSentences + hasEmoji, 1);
+
+  // ── Combine into final score ──
+  let score: number;
+
   if (review.voted_up) {
-    // Positive reviews: Start between 5.0-7.0 depending on length and sentiment
-    const lengthBonus = Math.min(reviewLength / 100, 1.5); // 0 to 1.5 based on length
-    const sentimentBonus = textSentiment.comparative > 0 ? textSentiment.comparative * 2 : 0;
-    baseScore = 5.0 + lengthBonus + sentimentBonus;
+    // Positive half: base 52, max ~100
+    const textContrib = textAligned
+      ? textMagnitude * 22        // agreeing text → boost up to +22
+      : textMagnitude * -10;      // contradicting text → pull down up to -10
+    const effortContrib = effortSignal * 10;
+    const playtimeContrib = playtimeSignal * 7;
+    const helpfulContrib = helpfulSignal * 5;
+    const toneContrib = toneSignal * 4;
+
+    score = 52 + textContrib + effortContrib + playtimeContrib + helpfulContrib + toneContrib;
   } else {
-    // Negative reviews: Start between 3.0-5.0 depending on length and sentiment
-    const lengthPenalty = Math.min(reviewLength / 100, 1.0);
-    const sentimentPenalty = textSentiment.comparative < 0 ? Math.abs(textSentiment.comparative) * 2 : 0;
-    baseScore = 5.0 - lengthPenalty - sentimentPenalty;
+    // Negative half: base 48, min ~0
+    const textContrib = textAligned
+      ? textMagnitude * 22        // agreeing negative text → push toward 0
+      : textMagnitude * -10;      // contradicting text → pull toward 50
+    const effortContrib = effortSignal * 10;
+    const playtimeContrib = playtimeSignal * 7;
+    const helpfulContrib = helpfulSignal * 5;
+    const toneContrib = toneSignal * 4;
+
+    score = 48 - textContrib - effortContrib - playtimeContrib - helpfulContrib - toneContrib;
   }
 
-  // Calculate adjustments from text sentiment
-  // Amplify absolute sentiment score heavily
-  const absoluteAdjustment = textSentiment.score * 2.0;
-
-  // Calculate positive/negative word ratio and amplify
-  const wordRatio = textSentiment.tokens.length > 0
-    ? (textSentiment.positive.length - textSentiment.negative.length) / textSentiment.tokens.length
-    : 0;
-  const wordRatioAdjustment = wordRatio * 15;
-
-  // Add variation based on word count (more words = more extreme scores)
-  const wordCountFactor = Math.min(textSentiment.tokens.length / 10, 2);
-  const wordCountAdjustment = (review.voted_up ? 1 : -1) * wordCountFactor * 0.5;
-
-  // Combine all sentiment signals
-  const totalAdjustment = absoluteAdjustment + wordRatioAdjustment + wordCountAdjustment;
-
-  // Allow wide adjustment range
-  const clampedAdjustment = Math.max(-5, Math.min(5, totalAdjustment));
-
-  // Calculate final score
-  let finalScore = baseScore + clampedAdjustment;
-
-  // Clamp to 0-10 range only
-  finalScore = Math.max(0, Math.min(10, finalScore));
+  score = Math.max(0, Math.min(100, Math.round(score)));
 
   const sentimentScore: SentimentScore = {
-    score: Math.round(finalScore * 10) / 10, // Round to 1 decimal
+    score,
     comparative: textSentiment.comparative,
     tokens: textSentiment.tokens,
     positive: textSentiment.positive,
     negative: textSentiment.negative,
   };
 
-  const sentimentLabel = getSentimentLabel(sentimentScore.score);
-
   return {
     ...review,
     sentiment: sentimentScore,
-    sentimentLabel,
+    sentimentLabel: getSentimentLabel(score),
   };
 }
 
-/**
- * Analyze multiple reviews
- */
+// ─── Label Thresholds (0-100 scale) ────────────────────────────────────
+export function getSentimentLabel(score: number): 'positive' | 'neutral' | 'negative' {
+  if (score >= 55) return 'positive';
+  if (score <= 45) return 'negative';
+  return 'neutral';
+}
+
+// ─── Batch Analysis ────────────────────────────────────────────────────
 export function analyzeReviews(reviews: SteamReview[]): ReviewWithSentiment[] {
   return reviews.map(review => analyzeReview(review));
 }
 
-/**
- * Calculate sentiment statistics from analyzed reviews
- */
+// ─── Statistics ────────────────────────────────────────────────────────
 export function calculateSentimentStats(
   reviews: ReviewWithSentiment[]
 ): SentimentStats {
   const totalReviews = reviews.length;
 
-  // Count sentiment labels
   const positiveCount = reviews.filter(r => r.sentimentLabel === 'positive').length;
   const neutralCount = reviews.filter(r => r.sentimentLabel === 'neutral').length;
   const negativeCount = reviews.filter(r => r.sentimentLabel === 'negative').length;
 
-  // Calculate average sentiment score
   const averageScore = totalReviews > 0
     ? reviews.reduce((sum, r) => sum + r.sentiment.score, 0) / totalReviews
     : 0;
 
   // Group reviews by date for timeline
   const reviewsByDate = new Map<string, ReviewWithSentiment[]>();
-
   reviews.forEach(review => {
     const date = new Date(review.timestamp_created * 1000).toISOString().split('T')[0];
-
     if (!reviewsByDate.has(date)) {
       reviewsByDate.set(date, []);
     }
     reviewsByDate.get(date)!.push(review);
   });
 
-  // Calculate timeline data
   const timeline = Array.from(reviewsByDate.entries())
     .map(([date, dateReviews]) => ({
       date,
@@ -300,44 +545,27 @@ export function calculateSentimentStats(
   };
 }
 
-/**
- * Get sentiment color class for UI
- */
+// ─── UI Helpers ────────────────────────────────────────────────────────
 export function getSentimentColor(label: 'positive' | 'neutral' | 'negative'): string {
   switch (label) {
-    case 'positive':
-      return 'text-green-500';
-    case 'negative':
-      return 'text-red-500';
-    case 'neutral':
-      return 'text-yellow-500';
+    case 'positive': return 'text-green-500';
+    case 'negative': return 'text-red-500';
+    case 'neutral': return 'text-yellow-500';
   }
 }
 
-/**
- * Get sentiment background color class for UI
- */
 export function getSentimentBgColor(label: 'positive' | 'neutral' | 'negative'): string {
   switch (label) {
-    case 'positive':
-      return 'bg-green-500/20';
-    case 'negative':
-      return 'bg-red-500/20';
-    case 'neutral':
-      return 'bg-yellow-500/20';
+    case 'positive': return 'bg-green-500/20';
+    case 'negative': return 'bg-red-500/20';
+    case 'neutral': return 'bg-yellow-500/20';
   }
 }
 
-/**
- * Get sentiment emoji
- */
 export function getSentimentEmoji(label: 'positive' | 'neutral' | 'negative'): string {
   switch (label) {
-    case 'positive':
-      return '😊';
-    case 'negative':
-      return '😞';
-    case 'neutral':
-      return '😐';
+    case 'positive': return '😊';
+    case 'negative': return '😞';
+    case 'neutral': return '😐';
   }
 }

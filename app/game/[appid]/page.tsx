@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { WorkshopSection } from "@/components/workshop-section";
 import { NewsSection } from "@/components/news-section";
 import { CommunityLinks } from "@/components/community-links";
+import { PlayerChart } from "@/components/player-chart";
 import type { SteamAppDetails, ReviewWithSentiment, SentimentStats } from "@/lib/types";
 
 interface PageProps {
@@ -196,6 +197,9 @@ export default function GamePage({ params }: PageProps) {
             </div>
           </div>
         </div>
+
+        {/* Player Count Chart */}
+        <PlayerChart appid={appid} />
 
         {/* Sentiment Overview */}
         {sentimentStats && (
@@ -391,7 +395,7 @@ export default function GamePage({ params }: PageProps) {
                             <Badge
                               variant={review.sentimentLabel}
                             >
-                              {review.sentimentLabel.toUpperCase()} (Score: {review.sentiment.score.toFixed(1)})
+                              {review.sentimentLabel.toUpperCase()} ({review.sentiment.score}/100)
                             </Badge>
                             <Badge variant={review.voted_up ? "positive" : "negative"}>
                               {review.voted_up ? "👍 Recommended" : "👎 Not Recommended"}
